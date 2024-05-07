@@ -1,0 +1,167 @@
+Sure, I can help with that! Here's an example Terraform module for provisioning a Node.js Kubernetes application using Oracle's Node.js SDK for Kubernetes Engine (NKE). This module will create a Kubernetes cluster, deploy a Node.js application, and expose it via a LoadBalancer service.
+
+**main.tf:**
+```hcl
+provider "oci" {
+  auth = "InstancePrincipal"
+  region = var.region
+}
+
+module "nke_cluster" {
+  source = "./modules/nke-cluster"
+  region = var.region
+  compartment_id = var.compartment_id
+  cluster_name = var.cluster_name
+  k8s_version = var.k8s_version
+  node_pool_name = var.node_pool_name
+  node_shape = var.node_shape
+}
+
+module "nke_app" {
+  source = "./modules/nke-app"
+  region = var.region
+  compartment_id = var.compartment_id
+  cluster_id = module.nke_cluster.cluster_id
+  app_name = var.app_name
+  app_image = var.app_image
+  app_port = var.app_port
+}
+
+output "app_endpoint" {
+  value = module.nke_app.app_endpoint
+}
+```
+
+**variables.tf:**
+```hcl
+variable "region" {
+  description = "OCI region"
+}
+
+variable "compartment_id" {
+  description = "OCI compartment OCID"
+}
+
+variable "cluster_name" {
+  description = "Name of the Kubernetes cluster"
+}
+
+variable "k8s_version" {
+  description = "Kubernetes version for the cluster"
+}
+
+variable "node_pool_name" {
+  description = "Name of the node pool"
+}
+
+variable "node_shape" {
+  description = "Shape of the worker nodes"
+}
+
+variable "app_name" {
+  description = "Name of the Node.js application"
+}
+
+variable "app_image" {
+  description = "Docker image for the Node.js application"
+}
+
+variable "app_port" {
+  description = "Port on which the Node.js application listens"
+}
+```
+
+**modules/nke-cluster/main.tf:**
+```hcl
+resource "oci_containerengine_cluster" "this" {
+  compartment_id = var.compartment_id
+  name = var.cluster_name
+  kubernetes_version = var.k8s_version
+  vcn_id = var.vcn_id
+  options {
+    service_lb_subnet_ids = [var.lb_subnet_id]
+  }
+  
+  node_pools {
+    name = var.node_pool_name
+    subnet_ids = [var.worker_subnet_id]
+    node_shape = var.node_shape
+    quantity_per_subnet = var.nodes_per_subnet
+  }
+}
+
+output "cluster_id" {
+  value = oci_containerengine_cluster.this.id
+}
+```
+
+**modules/nke-app/main.tf:**
+```hcl
+resource "oci_containerengine_node_pool" "this" {
+  compartment_id = var.compartment_id
+  cluster_id = var.cluster_id
+  name = var.node_pool_name
+  node_image_id = var.node_image_id
+  node_shape = var.node_shape
+  subnet_ids = [var.worker_subnet_id]
+  quantity_per_subnet = var.nodes_per_subnet
+}
+
+resource "oci_containerengine_node_pool_node_config_details" "this" {
+  node_shape = var.node_shape
+}
+
+resource "oci_containerengine_application" "this" {
+  cluster_id = var.cluster_id
+  compartment_id = var.compartment_id
+  display_name = var.app_name
+
+  kubernetes_manifest {
+    deploy_manifest = templatefile("${path.module}/app.yaml", {
+      app_image = var.app_image
+      app_port = var.app_port
+    })
+  }
+}
+
+output "app_endpoint" {
+  value = oci_containerengine_application.this.endpoint
+}
+```
+
+**modules/nke-app/app.yaml:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${var.app_name}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${var.app_name}
+  template:
+    metadata:
+      labels:
+        app: ${var.app_name}
+    spec:
+      containers:
+      - name: ${var.app_name}
+        image: ${var.app_image}
+        ports:
+        - containerPort: ${var.app_port}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${var.app_name}
+spec:
+  type: LoadBalancer
+  ports:
+  - port: ${var.app_port}
+    targetPort: ${var.app_port}
+  selector:
+    app: ${var.app_name}
+```
+
+This Terraform code will create an Oracle Kubernetes Engine (OKE) cluster, deploy a Node.js application using a Docker image, and expose it through a LoadBalancer service. Make sure to replace the variable values in your actual implementation.
