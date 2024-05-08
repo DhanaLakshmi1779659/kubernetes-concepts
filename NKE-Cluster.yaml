@@ -1,0 +1,112 @@
+Creating a Nutanix Kubernetes Engine (NKE) cluster using Terraform with custom modules involves defining resources such as node pools, networks, and the NKE cluster itself. Below is an example structure and code for achieving this:
+
+
+**Folder Structure:**
+```
+terraform/
+├── main.tf
+├── variables.tf
+├── providers.tf
+├── modules/
+│   ├── nke-cluster/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   ├── node-pool/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   └── network/
+│       ├── main.tf
+│       ├── variables.tf
+│       └── outputs.tf
+```
+
+**main.tf:**
+```hcl
+provider "nutanix" {
+  # Nutanix provider configuration here
+}
+
+module "network" {
+  source = "./modules/network"
+  # Network variables here
+}
+
+module "node_pool" {
+  source = "./modules/node-pool"
+  # Node pool variables here
+}
+
+module "nke_cluster" {
+  source = "./modules/nke-cluster"
+  cluster_name = var.cluster_name
+  node_pool_id = module.node_pool.node_pool_id
+  network_id = module.network.network_id
+  # NKE cluster variables here
+}
+```
+
+**variables.tf:**
+```hcl
+variable "cluster_name" {
+  description = "Name of the NKE cluster"
+}
+
+# Add other variables as needed
+```
+
+**providers.tf:**
+```hcl
+terraform {
+  required_providers {
+    nutanix = {
+      source = "my/nutanix"
+      # version constraints if needed
+    }
+  }
+}
+```
+
+**modules/nke-cluster/main.tf:**
+```hcl
+resource "nutanix_kubernetes_cluster" "this" {
+  name       = var.cluster_name
+  node_pool  = var.node_pool_id
+  network    = var.network_id
+  # Other NKE cluster configurations
+}
+
+output "nke_cluster_id" {
+  value = nutanix_kubernetes_cluster.this.id
+}
+```
+
+**modules/node-pool/main.tf:**
+```hcl
+resource "nutanix_kubernetes_node_pool" "this" {
+  name        = var.node_pool_name
+  node_count  = var.node_count
+  # Other node pool configurations
+}
+
+output "node_pool_id" {
+  value = nutanix_kubernetes_node_pool.this.id
+}
+```
+
+**modules/network/main.tf:**
+```hcl
+resource "nutanix_network" "this" {
+  name        = var.network_name
+  # Network configurations
+}
+
+output "network_id" {
+  value = nutanix_network.this.id
+}
+```
+
+Adjust the module files (`variables.tf`, `main.tf`, `outputs.tf`) within the `modules` directory according to your Nutanix and NKE cluster requirements. Make sure to replace placeholders like `my/nutanix` with the correct Nutanix provider source and configure the provider appropriately in `providers.tf`.
+
+This structure separates concerns and provides modularity for managing different aspects of your Nutanix environment and NKE clusters using Terraform. Adjust the variables and configurations as needed for your specific setup.
