@@ -1,0 +1,60 @@
+To provide Terraform code for deploying Helm charts in a Nutanix Karbon cluster, you'll need to use several Terraform providers:Nutanix Provider to interact with the Nutanix infrastructure.Helm Provider to manage Helm charts.Kubernetes Provider to manage Kubernetes resources directly if needed.Here's a basic example:Set up the Nutanix Provider: You'll need to configure the Nutanix provider with your credentials and endpoint.Obtain kubeconfig: Use the Nutanix provider to retrieve the kubeconfig for your Karbon cluster.Set up the Helm Provider: Configure the Helm provider with the kubeconfig retrieved.Terraform Configuration
+provider "nutanix" {
+  username = var.nutanix_username
+  password = var.nutanix_password
+  endpoint = var.nutanix_endpoint
+  insecure = true
+}
+
+# Retrieve the kubeconfig for the Karbon cluster
+data "nutanix_karbon_k8s_cluster" "karbon_cluster" {
+  name = var.cluster_name
+}
+
+resource "local_file" "kubeconfig" {
+  content  = data.nutanix_karbon_k8s_cluster.karbon_cluster.kubeconfig
+  filename = "${path.module}/kubeconfig"
+}
+
+provider "kubernetes" {
+  config_path = local_file.kubeconfig.filename
+}
+
+provider "helm" {
+  kubernetes {
+    config_path = local_file.kubeconfig.filename
+  }
+}
+===========
+variable "nutanix_username" {
+  description = "Username for Nutanix Prism Central"
+  type        = string
+}
+
+variable "nutanix_password" {
+  description = "Password for Nutanix Prism Central"
+  type        = string
+  sensitive   = true
+}
+
+variable "nutanix_endpoint" {
+  description = "Endpoint for Nutanix Prism Central"
+  type        = string
+}
+
+variable "cluster_name" {
+  description = "Name of the Nutanix Karbon Kubernetes cluster"
+  type        = string
+}
+========
+resource "helm_release" "nginx" {
+  name       = "nginx"
+  repository = "https://charts.bitnami.com/bitnami"
+  chart      = "nginx"
+  version    = "9.0.0"
+
+  set {
+    name  = "service.type"
+    value = "LoadBalancer"
+  }
+}
