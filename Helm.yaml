@@ -58,3 +58,40 @@ resource "helm_release" "nginx" {
     value = "LoadBalancer"
   }
 }
+
+
+trigger:
+- main  # Trigger on changes to the main branch
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  k8sServiceConnection: '<your-k8s-service-connection-name>'
+  namespace: '<your-namespace>'
+  helmChartName: 'netscaler'
+  helmChartRepo: 'https://example.com/netscaler/helm/charts'
+  releaseName: 'netscaler-release'
+
+stages:
+- stage: Deploy
+  displayName: Deploy to Kubernetes
+  jobs:
+  - job: DeployHelmChart
+    displayName: Deploy Helm Chart
+    steps:
+    - task: HelmInstaller@1
+      inputs:
+        helmVersionToInstall: 'latest'
+
+    - task: HelmDeploy@0
+      inputs:
+        connectionType: 'Kubernetes Service Connection'
+        kubernetesServiceEndpoint: '$(k8sServiceConnection)'
+        namespace: '$(namespace)'
+        command: 'upgrade'
+        chartType: 'Repository'
+        chartName: '$(helmChartRepo)/$(helmChartName)'
+        releaseName: '$(releaseName)'
+        install: true
+        arguments: '--set key1=value1,key2=value2'
